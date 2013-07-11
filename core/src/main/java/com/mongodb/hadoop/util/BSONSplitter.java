@@ -36,6 +36,7 @@ import org.bson.BasicBSONDecoder;
 import org.bson.LazyBSONObject;
 import org.bson.LazyBSONCallback;
 import org.bson.LazyBSONDecoder;
+import org.bson.io.Bits;
 
 public class BSONSplitter extends Configured implements Tool {
 
@@ -138,18 +139,14 @@ public class BSONSplitter extends Configured implements Tool {
             long blockSize = file.getBlockSize();
             long splitSize = Math.max(minSize, Math.min(maxSize, blockSize));
             log.info("Generating splits for " + path + " of up to " + splitSize + " bytes.");
-            long bytesRemaining = length;
-            int numDocs = 0;
             FSDataInputStream fsDataStream = fs.open(path);
             long curSplitLen = 0;
             long curSplitStart = 0;
-            long curSplitEnd = 0;
             try{
                 while(fsDataStream.getPos() + 1 < length){
-                    lazyCallback.reset();
-                    int bytesRead = lazyDec.decode(fsDataStream, lazyCallback);
-                    LazyBSONObject bo = (LazyBSONObject)lazyCallback.get();
-                    int bsonDocSize = bo.getBSONSize();
+                    byte barr[] = new byte[4];
+                    Bits.readFully(fsDataStream, barr, 0, 4);
+                    int bsonDocSize = Bits.readInt(barr);
                     if(curSplitLen + bsonDocSize >= splitSize){
                         FileSplit split = createFileSplit(file, fs, curSplitStart, curSplitLen);
                         splits.add(split);
